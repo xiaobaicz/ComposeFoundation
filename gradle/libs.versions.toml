@@ -19,4 +19,5 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 

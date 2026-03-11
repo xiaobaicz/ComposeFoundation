@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ComposeFoundation"
 include(":sample")
- 
+include(":foundation")
