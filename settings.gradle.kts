@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "ComposeFoundation"
 include(":sample")
 include(":foundation")
+include(":foundation-tv")

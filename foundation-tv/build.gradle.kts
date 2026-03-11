@@ -1,20 +1,16 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.android.library)
 }
 
 android {
-    namespace = "io.github.xiaobaicz.compose.sample"
+    namespace = "io.github.xiaobaicz.compose.foundation.tv"
     compileSdk {
         version = release(36) { minorApiLevel = 1 }
     }
 
     defaultConfig {
-        applicationId = "io.github.xiaobaicz.compose.sample"
         minSdk = 26
-        targetSdk = 36
-        versionCode = Version.code
-        versionName = Version.name
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -27,11 +23,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-    buildFeatures {
-        compose = true
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 }
 
@@ -47,14 +40,5 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    implementation(project(":foundation"))
-}
-
-object Version {
-    const val Y = 26
-    const val M = 3
-    const val D = 11
-    const val P = 0
-    val code get() = P + D * 100 + M * 10000 + Y * 1000000
-    val name get() = "$Y.$M.$D.$P"
+    api(project(":foundation"))
 }
