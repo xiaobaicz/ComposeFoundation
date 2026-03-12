@@ -1,5 +1,6 @@
 package io.github.xiaobaicz.compose.foundation.tv
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -7,6 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 
 sealed interface FocusState {
@@ -25,12 +30,53 @@ fun rememberFocusState(): FocusState {
 @Composable
 fun FocusState(
     modifier: Modifier = Modifier,
-    state: FocusState? = null,
+    state: FocusState = rememberFocusState(),
     content: @Composable FocusState.() -> Unit,
 ) {
-    val state = state ?: rememberFocusState()
+    val state = state as FocusStateImpl
+    Box(modifier = modifier.onFocusChanged { state.hasFocus = it.hasFocus }) {
+        state.content()
+    }
+}
+
+sealed interface FocusGroupState : FocusState {
+    fun Modifier.defaultFocus(): Modifier
+    fun requestFocus(focusDirection: FocusDirection = FocusDirection.Enter): Boolean
+}
+
+private class FocusGroupStateImpl : FocusGroupState {
+    val groupFocus = FocusRequester()
+    val fallbackFocus = FocusRequester()
+    override var hasFocus by mutableStateOf(false)
+
+    override fun Modifier.defaultFocus(): Modifier {
+        return this.focusRequester(fallbackFocus)
+    }
+
+    override fun requestFocus(focusDirection: FocusDirection): Boolean {
+        if (hasFocus) return true
+        return groupFocus.requestFocus(focusDirection)
+    }
+}
+
+@Composable
+fun rememberFocusGroupState(): FocusGroupState {
+    return remember { FocusGroupStateImpl() }
+}
+
+@Composable
+fun FocusGroupState(
+    modifier: Modifier = Modifier,
+    state: FocusGroupState = rememberFocusGroupState(),
+    content: @Composable FocusGroupState.() -> Unit,
+) {
+    val state = state as FocusGroupStateImpl
     Box(
-        modifier = modifier.onFocusChanged { (state as FocusStateImpl).hasFocus = it.hasFocus }
+        modifier = modifier
+            .onFocusChanged { state.hasFocus = it.hasFocus }
+            .focusRequester(state.groupFocus)
+            .focusRestorer(state.fallbackFocus)
+            .focusGroup()
     ) {
         state.content()
     }
