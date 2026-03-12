@@ -48,6 +48,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(project(":foundation"))
+    implementation(project(":foundation-tv"))
 }
 
 object Version {
