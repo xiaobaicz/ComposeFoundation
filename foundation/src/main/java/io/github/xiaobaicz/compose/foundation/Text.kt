@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -53,7 +54,7 @@ fun Text(
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
     shadow: Shadow? = null,
-    style: TextStyle = TextStyle.Default,
+    style: TextStyle = LocalTextStyle.current,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     maxLines: Int = 1,
@@ -61,7 +62,7 @@ fun Text(
     softWrap: Boolean = maxLines > 1,
 ) {
     val mergeStyle = style.merge(
-        color = color,
+        color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
@@ -100,7 +101,7 @@ fun Text(
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
     shadow: Shadow? = null,
-    style: TextStyle = TextStyle.Default,
+    style: TextStyle = LocalTextStyle.current,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     maxLines: Int = 1,
@@ -109,7 +110,7 @@ fun Text(
     inlineContent: Map<String, InlineTextContent> = mapOf(),
 ) {
     val mergeStyle = style.merge(
-        color = color,
+        color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
@@ -152,7 +153,7 @@ fun TextField(
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
     shadow: Shadow? = null,
-    textStyle: TextStyle = TextStyle.Default,
+    textStyle: TextStyle = LocalTextStyle.current,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onKeyboardAction: KeyboardActionHandler? = null,
     lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
@@ -164,7 +165,7 @@ fun TextField(
     scrollState: ScrollState = rememberScrollState(),
 ) {
     val mergeTextStyle = textStyle.merge(
-        color = color,
+        color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
