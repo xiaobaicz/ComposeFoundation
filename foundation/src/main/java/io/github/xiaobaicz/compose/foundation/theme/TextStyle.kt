@@ -1,4 +1,4 @@
-package io.github.xiaobaicz.compose.foundation
+package io.github.xiaobaicz.compose.foundation.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider

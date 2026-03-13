@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
+import io.github.xiaobaicz.compose.foundation.theme.LocalContentColor
+import io.github.xiaobaicz.compose.foundation.theme.LocalTextStyle
 import kotlin.math.min
 
 @Composable

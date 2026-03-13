@@ -16,9 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.takeOrElse
+import io.github.xiaobaicz.compose.foundation.theme.ButtonColor
+import io.github.xiaobaicz.compose.foundation.theme.ContentColorProvider
+import io.github.xiaobaicz.compose.foundation.theme.LocalButtonColor
+import io.github.xiaobaicz.compose.foundation.theme.LocalContentColor
+import io.github.xiaobaicz.compose.foundation.theme.takeOrElse
+import kotlin.math.min
 
 interface ButtonScope {
     val isFocus: Boolean
@@ -81,8 +89,9 @@ fun Button(
     }
 }
 
+@Stable
 fun TextButtonDecorator(
-    all: Dp = 0.dp,
+    all: Dp = Dp.Unspecified,
     buttonColor: ButtonColor = ButtonColor.Unspecified
 ) = TextButtonDecorator(
     start = all,
@@ -92,9 +101,10 @@ fun TextButtonDecorator(
     buttonColor = buttonColor,
 )
 
+@Stable
 fun TextButtonDecorator(
-    horizontal: Dp = 0.dp,
-    vertices: Dp = 0.dp,
+    horizontal: Dp = Dp.Unspecified,
+    vertices: Dp = Dp.Unspecified,
     buttonColor: ButtonColor = ButtonColor.Unspecified
 ) = TextButtonDecorator(
     start = horizontal,
@@ -106,27 +116,32 @@ fun TextButtonDecorator(
 
 @Immutable
 class TextButtonDecorator(
-    @Stable val start: Dp = 0.dp,
-    @Stable val top: Dp = 0.dp,
-    @Stable val end: Dp = 0.dp,
-    @Stable val bottom: Dp = 0.dp,
+    @Stable val start: Dp = Dp.Unspecified,
+    @Stable val top: Dp = Dp.Unspecified,
+    @Stable val end: Dp = Dp.Unspecified,
+    @Stable val bottom: Dp = Dp.Unspecified,
     @Stable val buttonColor: ButtonColor = ButtonColor.Unspecified,
 ) : ButtonDecorator {
     @Composable
     override fun ButtonScope.Decoration(content: @Composable (ButtonScope.() -> Unit)) {
         val buttonColor = buttonColor.takeOrElse { LocalButtonColor.current }
+        val start = start.takeOrElse { 16.dp }
+        val top = top.takeOrElse { 8.dp }
+        val end = end.takeOrElse { 16.dp }
+        val bottom = bottom.takeOrElse { 8.dp }
         Box(modifier = Modifier.padding(start, top, end, bottom)) {
-            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnFocus
-            ContentColorProvider(contentColor) {
+            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
+            ContentColorProvider(contentColor.takeOrElse { LocalContentColor.current }) {
                 content()
             }
         }
     }
 }
 
+@Stable
 fun RoundButtonDecorator(
-    all: Dp = 0.dp,
-    radius: Dp = 0.dp,
+    all: Dp = Dp.Unspecified,
+    radius: Dp = Dp.Unspecified,
     buttonColor: ButtonColor = ButtonColor.Unspecified
 ) = RoundButtonDecorator(
     start = all,
@@ -137,9 +152,11 @@ fun RoundButtonDecorator(
     buttonColor = buttonColor,
 )
 
+@Stable
 fun RoundButtonDecorator(
-    horizontal: Dp = 0.dp, vertices: Dp = 0.dp,
-    radius: Dp = 0.dp,
+    horizontal: Dp = Dp.Unspecified,
+    vertices: Dp = Dp.Unspecified,
+    radius: Dp = Dp.Unspecified,
     buttonColor: ButtonColor = ButtonColor.Unspecified
 ) = RoundButtonDecorator(
     start = horizontal,
@@ -152,26 +169,31 @@ fun RoundButtonDecorator(
 
 @Immutable
 class RoundButtonDecorator(
-    @Stable val start: Dp = 0.dp,
-    @Stable val top: Dp = 0.dp,
-    @Stable val end: Dp = 0.dp,
-    @Stable val bottom: Dp = 0.dp,
-    @Stable val radius: Dp = 0.dp,
+    @Stable val start: Dp = Dp.Unspecified,
+    @Stable val top: Dp = Dp.Unspecified,
+    @Stable val end: Dp = Dp.Unspecified,
+    @Stable val bottom: Dp = Dp.Unspecified,
+    @Stable val radius: Dp = Dp.Unspecified,
     @Stable val buttonColor: ButtonColor = ButtonColor.Unspecified,
 ) : ButtonDecorator {
     @Composable
     override fun ButtonScope.Decoration(content: @Composable (ButtonScope.() -> Unit)) {
         val buttonColor = buttonColor.takeOrElse { LocalButtonColor.current }
+        val start = start.takeOrElse { 16.dp }
+        val top = top.takeOrElse { 8.dp }
+        val end = end.takeOrElse { 16.dp }
+        val bottom = bottom.takeOrElse { 8.dp }
         Box(
             modifier = Modifier
                 .drawBehind {
-                    val color = if (isFocus) buttonColor.focus else buttonColor.unFocus
+                    val color = if (isFocus) buttonColor.focus else buttonColor.unfocus
+                    val radius = radius.takeOrElse { (min(size.width, size.height) / 2).toDp() }
                     drawRoundRect(color = color, cornerRadius = CornerRadius(radius.toPx()))
                 }
                 .padding(start, top, end, bottom)
         ) {
-            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnFocus
-            ContentColorProvider(contentColor) {
+            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
+            ContentColorProvider(contentColor.takeOrElse { LocalContentColor.current }) {
                 content()
             }
         }
