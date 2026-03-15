@@ -28,6 +28,7 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.dp
+import kotlin.math.min
 
 enum class SkeletonState {
     Loading, Complete
@@ -139,6 +140,6 @@ private val defaultSkeletonDrawScope: DrawScope.(Float) -> Unit = {
             it to Color(0xFFCCCCCC),
             1f to Color.Gray,
         ),
-        cornerRadius = CornerRadius(2.dp.toPx())
+        cornerRadius = CornerRadius(min(size.width, size.height) / 2)
     )
 }
