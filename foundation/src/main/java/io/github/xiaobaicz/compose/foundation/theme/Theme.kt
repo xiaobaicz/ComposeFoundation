@@ -15,15 +15,12 @@ fun Theme(
         LocalTextStyles provides textStyles,
         LocalButtonDecorators provides buttonDecorators,
     ) {
-        TextStyleProvider(Theme.textStyles.normal) {
-            ContentColorProvider(Theme.colors.content) {
-                val buttonColor = Theme.colors.let {
-                    ButtonColor(it.focus, it.unfocus, it.contentFocus, it.contentUnfocus)
-                }
-                ButtonColorProvider(buttonColor) {
-                    content()
-                }
-            }
+        CompositionLocalProvider(
+            LocalTextStyle provides Theme.textStyles.normal,
+            LocalContentColor provides Theme.colors.content,
+            LocalButtonDecorator provides Theme.buttonDecorators.roundButton
+        ) {
+            content()
         }
     }
 }

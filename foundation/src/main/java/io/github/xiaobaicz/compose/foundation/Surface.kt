@@ -3,6 +3,7 @@ package io.github.xiaobaicz.compose.foundation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -16,9 +17,13 @@ fun Surface(
     modifier: Modifier = Modifier,
     color: Color = Theme.colors.surface,
     shape: Shape = RectangleShape,
+    maxSize: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier.background(color, shape)) {
+    Column(
+        modifier = modifier
+            .thenIf(maxSize) { it.fillMaxSize() }
+            .background(color, shape)) {
         content()
     }
 }
@@ -28,9 +33,14 @@ fun Surface(
     brush: Brush,
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
+    maxSize: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier.background(brush, shape)) {
+    Column(
+        modifier = modifier
+            .thenIf(maxSize) { it.fillMaxSize() }
+            .background(brush, shape)
+    ) {
         content()
     }
 }

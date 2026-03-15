@@ -9,20 +9,12 @@ data class Colors(
     val theme: Color,
     val surface: Color,
     val content: Color,
-    val focus: Color,
-    val unfocus: Color,
-    val contentFocus: Color,
-    val contentUnfocus: Color,
 ) {
     companion object {
         val default = Colors(
             theme = Color.Yellow,
             surface = Color.Black,
             content = Color.White,
-            focus = Color.Yellow,
-            unfocus = Color.Gray,
-            contentFocus = Color.Black,
-            contentUnfocus = Color.White,
         )
     }
 }

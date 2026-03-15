@@ -34,15 +34,3 @@ val ButtonColor.isSpecified get() = !isUnspecified
 fun ButtonColor.takeOrElse(color: @Composable () -> ButtonColor): ButtonColor {
     return if (isSpecified) this else color()
 }
-
-val LocalButtonColor = compositionLocalOf { ButtonColor.Unspecified }
-
-@Composable
-fun ButtonColorProvider(
-    color: ButtonColor = ButtonColor.Unspecified,
-    content: @Composable () -> Unit
-) {
-    CompositionLocalProvider(LocalButtonColor provides color) {
-        content()
-    }
-}
