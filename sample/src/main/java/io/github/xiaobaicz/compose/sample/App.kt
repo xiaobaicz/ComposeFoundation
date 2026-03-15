@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -16,6 +17,7 @@ import io.github.xiaobaicz.compose.foundation.SkeletonState
 import io.github.xiaobaicz.compose.foundation.Surface
 import io.github.xiaobaicz.compose.foundation.Text
 import io.github.xiaobaicz.compose.foundation.skeletonItem
+import io.github.xiaobaicz.compose.foundation.tv.lazy.LazyColumn
 import kotlinx.coroutines.delay
 
 @Composable
@@ -37,20 +39,32 @@ fun TVApp() {
         state = SkeletonState.Complete
     }
     Skeleton(state) {
-        Button({}, modifier = Modifier.padding(top = 8.dp).skeletonItem()) {
-            Text("AAAAA")
+        var size by remember { mutableIntStateOf(0) }
+        LaunchedEffect(Unit) {
+            delay(5000L)
+            size = 20
         }
-        Button({}, modifier = Modifier.padding(top = 8.dp).skeletonItem()) {
-            Text("AAAAAAAAAA")
-        }
-        Button({}, modifier = Modifier.padding(top = 8.dp).skeletonItem()) {
-            Text("AAAAA")
-        }
-        Button({}, modifier = Modifier.padding(top = 8.dp).skeletonItem()) {
-            Text("AAAAAAAAAA")
-        }
-        Button({}, modifier = Modifier.padding(top = 8.dp).skeletonItem()) {
-            Text("AAAAA")
+        LazyColumn {
+            item {
+                Button(
+                    onClick = {}, modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .skeletonItem()
+                        .markAsFocusable()
+                ) {
+                    Text("First")
+                }
+            }
+            items(size) {
+                Button(
+                    onClick = {}, modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .skeletonItem()
+                        .markAsFocusable()
+                ) {
+                    Text("A: $it")
+                }
+            }
         }
     }
 }
