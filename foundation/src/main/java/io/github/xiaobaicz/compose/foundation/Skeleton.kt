@@ -15,6 +15,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -27,15 +29,33 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.platform.InspectorInfo
-import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
-enum class SkeletonState {
-    Loading, Complete
+class SkeletonState {
+    enum class State {
+        Loading, Complete;
+
+        val isLoading get() = this == Loading
+        val isComplete get() = this == Complete
+    }
+
+    var value by mutableStateOf(State.Loading)
+        private set
+
+    fun loading() {
+        value = State.Loading
+    }
+
+    fun complete() {
+        value = State.Complete
+    }
 }
 
+@Composable
+fun rememberSkeletonState(): SkeletonState = remember { SkeletonState() }
+
 val LocalSkeletonState = compositionLocalOf {
-    SkeletonState.Complete
+    SkeletonState.State.Complete
 }
 private val LocalSkeletonSpec = compositionLocalOf {
     defaultSkeletonAnimationSpec
@@ -52,7 +72,7 @@ fun Skeleton(
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
-        LocalSkeletonState provides state,
+        LocalSkeletonState provides state.value,
         LocalSkeletonSpec provides spec,
         LocalSkeletonDraw provides scope,
     ) {
@@ -79,7 +99,7 @@ private class SkeletonItemModifierNode : Modifier.Node(), DrawModifierNode,
 
     override fun ContentDrawScope.draw() {
         val state = currentValueOf(LocalSkeletonState)
-        if (state == SkeletonState.Loading) {
+        if (state.isLoading) {
             val key = currentValueOf(LocalSkeletonSpec)
             val vectorSpec = cache.get(key) { key.vectorize(Float.VectorConverter) }
             progress = vectorSpec.getValueFromNanos(playTime, init, target, velocity).value
@@ -115,7 +135,7 @@ private object SkeletonItemModifierNodeElement : ModifierNodeElement<SkeletonIte
     }
 
     override fun equals(other: Any?): Boolean {
-        return other is SkeletonItemModifierNodeElement
+        return this === other
     }
 
     override fun InspectorInfo.inspectableProperties() {
