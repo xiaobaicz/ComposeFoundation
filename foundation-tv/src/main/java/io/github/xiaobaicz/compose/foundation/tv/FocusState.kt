@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusRequester.Companion.FocusRequesterFactory.component1
+import androidx.compose.ui.focus.FocusRequester.Companion.FocusRequesterFactory.component2
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -40,13 +42,16 @@ fun FocusState(
 }
 
 sealed interface FocusGroupState : FocusState {
+    val groupFocus: FocusRequester
+    val fallbackFocus: FocusRequester
     fun Modifier.defaultFocus(): Modifier
     fun requestFocus(focusDirection: FocusDirection = FocusDirection.Enter): Boolean
 }
 
-private class FocusGroupStateImpl : FocusGroupState {
-    val groupFocus = FocusRequester()
-    val fallbackFocus = FocusRequester()
+private class FocusGroupStateImpl(
+    override val groupFocus: FocusRequester,
+    override val fallbackFocus: FocusRequester,
+) : FocusGroupState {
     override var hasFocus by mutableStateOf(false)
 
     override fun Modifier.defaultFocus(): Modifier {
@@ -61,7 +66,16 @@ private class FocusGroupStateImpl : FocusGroupState {
 
 @Composable
 fun rememberFocusGroupState(): FocusGroupState {
-    return remember { FocusGroupStateImpl() }
+    val (group, fallback) = remember { FocusRequester.createRefs() }
+    return rememberFocusGroupState(group, fallback)
+}
+
+@Composable
+fun rememberFocusGroupState(
+    groupFocus: FocusRequester,
+    fallbackFocus: FocusRequester,
+): FocusGroupState {
+    return remember { FocusGroupStateImpl(groupFocus, fallbackFocus) }
 }
 
 @Composable
