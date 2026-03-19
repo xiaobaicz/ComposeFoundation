@@ -63,6 +63,7 @@ fun Text(
     minLines: Int = 1,
     softWrap: Boolean = maxLines > 1,
 ) {
+    require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeStyle = style.merge(
         color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
@@ -111,6 +112,7 @@ fun Text(
     softWrap: Boolean = maxLines > 1,
     inlineContent: Map<String, InlineTextContent> = mapOf(),
 ) {
+    require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeStyle = style.merge(
         color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
@@ -166,6 +168,7 @@ fun TextField(
     decorator: TextFieldDecorator? = null,
     scrollState: ScrollState = rememberScrollState(),
 ) {
+    require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeTextStyle = textStyle.merge(
         color = color.takeOrElse { LocalContentColor.current },
         fontSize = fontSize,
@@ -201,7 +204,7 @@ val defaultLineHeightStyle = LineHeightStyle(
 )
 
 @Immutable
-data class TextAutoSizeByLineHeight(
+private data class TextAutoSizeByLineHeight(
     @Stable val fontSize: TextUnit,
     @Stable val lineHeight: TextUnit,
     @Stable val lineHeightFactor: Float,
