@@ -17,15 +17,12 @@ import io.github.xiaobaicz.compose.foundation.theme.LocalButtonDecorator
 
 @Composable
 fun rememberButtonState(): ButtonState {
-    return remember { ButtonStateImpl() }
+    return remember { ButtonState() }
 }
 
-sealed interface ButtonState {
-    val isFocus: Boolean
-}
-
-private class ButtonStateImpl : ButtonState {
-    override var isFocus by mutableStateOf(false)
+class ButtonState {
+    var hasFocus by mutableStateOf(false)
+        internal set
 }
 
 @Composable
@@ -45,12 +42,9 @@ fun Button(
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable ButtonState.() -> Unit,
 ) {
-    state as ButtonStateImpl
     Box(
         modifier = modifier
-            .onFocusChanged {
-                state.isFocus = it.isFocused
-            }
+            .onFocusChanged { state.hasFocus = it.hasFocus }
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = indication,

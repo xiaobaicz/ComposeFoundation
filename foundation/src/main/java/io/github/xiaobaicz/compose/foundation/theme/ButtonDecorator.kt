@@ -71,7 +71,7 @@ class TextButtonDecorator(
         val end = end.takeOrElse { 16.dp }
         val bottom = bottom.takeOrElse { 8.dp }
         Box(modifier = Modifier.padding(start, top, end, bottom)) {
-            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
+            val contentColor = if (hasFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
             ContentColorProvider(contentColor.takeOrElse { LocalContentColor.current }) {
                 content()
             }
@@ -126,13 +126,13 @@ class RoundButtonDecorator(
         Box(
             modifier = Modifier
                 .drawBehind {
-                    val color = if (isFocus) buttonColor.focus else buttonColor.unfocus
+                    val color = if (hasFocus) buttonColor.focus else buttonColor.unfocus
                     val radius = radius.takeOrElse { (min(size.width, size.height) / 2).toDp() }
                     drawRoundRect(color = color, cornerRadius = CornerRadius(radius.toPx()))
                 }
                 .padding(start, top, end, bottom)
         ) {
-            val contentColor = if (isFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
+            val contentColor = if (hasFocus) buttonColor.contentFocus else buttonColor.contentUnfocus
             ContentColorProvider(contentColor.takeOrElse { LocalContentColor.current }) {
                 content()
             }
