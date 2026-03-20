@@ -28,7 +28,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.node.ModifierNodeElement
@@ -245,7 +247,7 @@ private class LazyListCore(
             chain.selectNode.index == index -> return
             chain.prevNode?.index == index -> startScrollAnim(index, chain.forward)
             chain.nextNode?.index == index -> startScrollAnim(index, chain.backward)
-            else -> throw IllegalStateException("Please manually change the focus via state.")
+            else -> throw IllegalStateException("Please manually change the focus via state. (current: ${chain.selectNode.index} - select: $index)")
         }
     }
 
@@ -352,6 +354,9 @@ private class LazyListCore(
     }
 
     private abstract inner class Layout {
+        abstract val IntrinsicMeasureScope.paddingStart: Int
+        abstract val IntrinsicMeasureScope.paddingEnd: Int
+
         abstract fun LazyLayoutMeasureScope.createNode(const: Constraints, index: Int): ItemNode
 
         fun LazyLayoutMeasureScope.createNodeChain(constraints: Constraints): NodeChain {
@@ -372,21 +377,24 @@ private class LazyListCore(
             val spacing = state.spacing.roundToPx()
             while (true) {
                 val firstNode = nodeChain.firstNode
+                if (nodeChain.selectNode !== firstNode && condition(firstNode)) break
                 if (firstNode.index - 1 < 0) break
                 val prevNode = createNode(constraints, firstNode.index - 1)
                 prevNode.offset = firstNode.startEdge - spacing - prevNode.axisSize
                 firstNode.prev = prevNode
                 prevNode.next = firstNode
                 nodeChain.firstNode = prevNode
-                if (condition(prevNode)) break
             }
         }
 
-        abstract fun LazyLayoutMeasureScope.fillStartEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain
-        )
+        fun LazyLayoutMeasureScope.fillStartEdge(constraints: Constraints, nodeChain: NodeChain) {
+            val containerAxisSize = containerAxisSize(constraints)
+            val windowOffset = containerAxisSize * state.windowOffset
+            val limit = windowOffset.roundToInt()
+            val edge = (nodeChain.selectNode.startEdge - limit).coerceAtMost(0)
+            val maxEdge = edge - paddingStart
+            fillStartEdge(constraints, nodeChain) { it.startEdge <= maxEdge }
+        }
 
         fun LazyLayoutMeasureScope.fillEndEdge(
             constraints: Constraints,
@@ -396,21 +404,24 @@ private class LazyListCore(
             val spacing = state.spacing.roundToPx()
             while (true) {
                 val lastNode = nodeChain.lastNode
+                if (nodeChain.selectNode !== lastNode && condition(lastNode)) break
                 if (lastNode.index + 1 >= itemCount) break
                 val nextNode = createNode(constraints, lastNode.index + 1)
                 nextNode.offset = lastNode.endEdge + spacing
                 lastNode.next = nextNode
                 nextNode.prev = lastNode
                 nodeChain.lastNode = nextNode
-                if (condition(nextNode)) break
             }
         }
 
-        abstract fun LazyLayoutMeasureScope.fillEndEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain,
-        )
+        fun LazyLayoutMeasureScope.fillEndEdge(constraints: Constraints, nodeChain: NodeChain) {
+            val containerAxisSize = containerAxisSize(constraints)
+            val windowOffset = containerAxisSize * state.windowOffset
+            val limit = (containerAxisSize - windowOffset).roundToInt()
+            val edge = (nodeChain.selectNode.endEdge + limit).coerceAtLeast(containerAxisSize)
+            val maxEdge = edge + paddingEnd
+            fillEndEdge(constraints, nodeChain) { it.endEdge >= maxEdge }
+        }
 
         abstract fun containerAxisSize(constraints: Constraints): Int
 
@@ -463,11 +474,11 @@ private class LazyListCore(
 
             when (state.keyline) {
                 Keyline.BothEdge -> {
-                    nodeChain.nextNode { fillEndEdge(childConst, it, this) }
+                    nodeChain.nextNode { fillEndEdge(childConst, this) }
                     move2EndEdge(nodeChain, containerAxisSize)
-                    nodeChain.prevNode { fillStartEdge(childConst, it, this) }
+                    nodeChain.prevNode { fillStartEdge(childConst, this) }
                     if (move2StartEdge(nodeChain)) {
-                        nodeChain.nextNode { fillEndEdge(childConst, it, this) }
+                        nodeChain.nextNode { fillEndEdge(childConst, this) }
                     }
                     nodeChain.prevNode {
                         val maxForward = firstNode.startEdge.coerceAtMost(0)
@@ -484,9 +495,9 @@ private class LazyListCore(
                 }
 
                 Keyline.StartEdge -> {
-                    nodeChain.prevNode { fillStartEdge(childConst, it, this) }
+                    nodeChain.prevNode { fillStartEdge(childConst, this) }
                     move2StartEdge(nodeChain)
-                    nodeChain.nextNode { fillEndEdge(childConst, it, this) }
+                    nodeChain.nextNode { fillEndEdge(childConst, this) }
                     nodeChain.prevNode {
                         val maxForward = firstNode.startEdge.coerceAtMost(0)
                         val forward = calculateScrollOffset(childConst, it)
@@ -498,10 +509,10 @@ private class LazyListCore(
                 }
 
                 Keyline.EndEdge -> {
-                    nodeChain.nextNode { fillEndEdge(childConst, it, this) }
+                    nodeChain.nextNode { fillEndEdge(childConst, this) }
                     move2EndEdge(nodeChain, containerAxisSize)
                     nodeChain.prevNode {
-                        fillStartEdge(childConst, it, this)
+                        fillStartEdge(childConst, this)
                         this.forward = calculateScrollOffset(childConst, it).coerceAtMost(0)
                     }
                     nodeChain.nextNode {
@@ -512,8 +523,8 @@ private class LazyListCore(
                 }
 
                 Keyline.NoEdge -> {
-                    nodeChain.prevNode { fillStartEdge(childConst, it, this) }
-                    nodeChain.nextNode { fillEndEdge(childConst, it, this) }
+                    nodeChain.prevNode { fillStartEdge(childConst, this) }
+                    nodeChain.nextNode { fillEndEdge(childConst, this) }
                     nodeChain.prevNode {
                         this.forward = calculateScrollOffset(childConst, it).coerceAtMost(0)
                     }
@@ -549,6 +560,11 @@ private class LazyListCore(
     }
 
     private inner class LayoutByColumn : Layout() {
+        override val IntrinsicMeasureScope.paddingStart: Int
+            get() = state.contentPadding.calculateTopPadding().roundToPx()
+        override val IntrinsicMeasureScope.paddingEnd: Int
+            get() = state.contentPadding.calculateBottomPadding().roundToPx()
+
         override fun LazyLayoutMeasureScope.createNode(
             const: Constraints,
             index: Int
@@ -557,28 +573,6 @@ private class LazyListCore(
             if (placeableList.size != 1) throw PlaceableQuantityException(index)
             val placeable = placeableList.first()
             return ItemNode(index, placeable.height, placeable.width, placeable)
-        }
-
-        override fun LazyLayoutMeasureScope.fillStartEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain
-        ) {
-            val paddingStart = state.contentPadding.calculateTopPadding().roundToPx()
-            val startEdge = startNode.startEdge - containerAxisSize(constraints) / 2 - paddingStart
-            val limitEdge = startEdge.coerceAtMost(-paddingStart)
-            fillStartEdge(constraints, nodeChain) { it.startEdge <= limitEdge }
-        }
-
-        override fun LazyLayoutMeasureScope.fillEndEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain,
-        ) {
-            val paddingEnd = state.contentPadding.calculateBottomPadding().roundToPx()
-            val endEdge = (startNode.endEdge + containerAxisSize(constraints) / 2 + paddingEnd)
-            val limitEdge = endEdge.coerceAtLeast(containerAxisSize(constraints) + paddingEnd)
-            fillEndEdge(constraints, nodeChain) { it.endEdge >= limitEdge }
         }
 
         override fun containerAxisSize(constraints: Constraints): Int {
@@ -600,6 +594,11 @@ private class LazyListCore(
     }
 
     private inner class LayoutByRow : Layout() {
+        override val IntrinsicMeasureScope.paddingStart: Int
+            get() = state.contentPadding.calculateStartPadding(layoutDirection).roundToPx()
+        override val IntrinsicMeasureScope.paddingEnd: Int
+            get() = state.contentPadding.calculateEndPadding(layoutDirection).roundToPx()
+
         override fun LazyLayoutMeasureScope.createNode(
             const: Constraints,
             index: Int
@@ -608,29 +607,6 @@ private class LazyListCore(
             if (placeableList.size != 1) throw PlaceableQuantityException(index)
             val placeable = placeableList.first()
             return ItemNode(index, placeable.width, placeable.height, placeable)
-        }
-
-        override fun LazyLayoutMeasureScope.fillStartEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain
-        ) {
-            val paddingStart =
-                state.contentPadding.calculateStartPadding(layoutDirection).roundToPx()
-            val startEdge = startNode.startEdge - containerAxisSize(constraints) / 2 - paddingStart
-            val limitEdge = startEdge.coerceAtMost(-paddingStart)
-            fillStartEdge(constraints, nodeChain) { it.startEdge <= limitEdge }
-        }
-
-        override fun LazyLayoutMeasureScope.fillEndEdge(
-            constraints: Constraints,
-            startNode: ItemNode,
-            nodeChain: NodeChain,
-        ) {
-            val paddingEnd = state.contentPadding.calculateEndPadding(layoutDirection).roundToPx()
-            val endEdge = startNode.endEdge + containerAxisSize(constraints) / 2 + paddingEnd
-            val limitEdge = endEdge.coerceAtLeast(containerAxisSize(constraints) + paddingEnd)
-            fillEndEdge(constraints, nodeChain) { it.endEdge >= limitEdge }
         }
 
         override fun containerAxisSize(constraints: Constraints): Int {
@@ -750,6 +726,12 @@ private class LazyListStateImpl(
     val windowOffset: Float,
     val itemOffset: Float,
 ) : LazyListState {
+    init {
+        require(windowOffset in 0f..1f) { "windowOffset should be in range [0f, 1f]" }
+        require(itemOffset in 0f..1f) { "itemOffset should be in range [0f, 1f]" }
+        require(spacing >= 0.dp) { "spacing should be non-negative" }
+    }
+
     override var select by mutableIntStateOf(select)
     override val selectFlow = snapshotFlow { this.select }
     override val composerStart = MutableStateFlow(SystemClock.elapsedRealtime())
@@ -767,7 +749,46 @@ private class LazyListStateImpl(
     fun composerEnd() {
         composerEnd.tryEmit(SystemClock.elapsedRealtime())
     }
+
+    class StateSaver(
+        val vertical: Boolean,
+        val spacing: Dp,
+        val spec: AnimationSpec<Float>,
+        val contentPadding: PaddingValues,
+        val clip: Boolean,
+        val keyline: Keyline,
+        val windowOffset: Float,
+        val itemOffset: Float
+    ) : Saver<LazyListStateImpl, Int> {
+        override fun SaverScope.save(value: LazyListStateImpl): Int {
+            return value.select
+        }
+
+        override fun restore(value: Int): LazyListStateImpl {
+            return LazyListStateImpl(
+                select = value,
+                vertical = vertical,
+                spacing = spacing,
+                spec = spec,
+                contentPadding = contentPadding,
+                clip = clip,
+                keyline = keyline,
+                windowOffset = windowOffset,
+                itemOffset = itemOffset
+            )
+        }
+    }
 }
+
+enum class Keyline {
+    BothEdge, StartEdge, EndEdge, NoEdge
+}
+
+private class PlaceableQuantityException(itemIndex: Int) :
+    RuntimeException("Item $itemIndex placeable quantity is not 1")
+
+private class NoRegisterFocusException(index: Int) :
+    RuntimeException("Item(index: $index) did not register with registerFocusable()")
 
 private val defSpec = tween<Float>(150, 0, LinearEasing)
 
@@ -782,35 +803,25 @@ private fun rememberLazyListState(
     keyline: Keyline,
     windowOffset: Float,
     itemOffset: Float,
-): LazyListStateImpl {
+): LazyListState {
     val saver = remember(
-        keys = arrayOf(
-            vertical, select, spacing, spec, contentPadding,
-            clip, keyline, windowOffset, itemOffset,
-        )
+        vertical, spacing, spec, contentPadding,
+        clip, keyline, windowOffset, itemOffset,
     ) {
-        listSaver(
-            save = { listOf(it.select) },
-            restore = {
-                LazyListStateImpl(
-                    select = it[0],
-                    vertical = vertical,
-                    spacing = spacing,
-                    spec = spec,
-                    contentPadding = contentPadding,
-                    clip = clip,
-                    keyline = keyline,
-                    windowOffset = windowOffset,
-                    itemOffset = itemOffset
-                )
-            }
+        LazyListStateImpl.StateSaver(
+            vertical = vertical,
+            spacing = spacing,
+            spec = spec,
+            contentPadding = contentPadding,
+            clip = clip,
+            keyline = keyline,
+            windowOffset = windowOffset,
+            itemOffset = itemOffset
         )
     }
     return rememberSaveable(
-        inputs = arrayOf(
-            vertical, select, spacing, spec, contentPadding,
-            clip, keyline, windowOffset, itemOffset
-        ),
+        vertical, select, spacing, spec, contentPadding,
+        clip, keyline, windowOffset, itemOffset,
         saver = saver
     ) {
         LazyListStateImpl(
