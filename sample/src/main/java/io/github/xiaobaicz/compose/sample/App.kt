@@ -83,7 +83,7 @@ fun TVApp() {
                             onClick = {}, modifier = Modifier
                                 .padding(horizontal = 16.dp)
                                 .registerFocusable()
-                                .itemFocusScale(1.15f, 1f)
+                                .itemFocusAnimByScale(1.15f)
                                 .itemFocusBorder(2.dp, Color.Red, RoundedCornerShape(32.dp))
                         ) {
                             Text("$r: $c", lineHeight = 150.sp)

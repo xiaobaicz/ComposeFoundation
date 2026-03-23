@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.layout.LazyLayoutItemProvider
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasurePolicy
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -37,10 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusProperties
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusRequesterModifierNode
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.requestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Shape
@@ -106,11 +104,25 @@ inline fun <T> LazyListScope.items(
     )
 }
 
+inline fun <T> LazyListScope.itemsIndexed(
+    items: List<T>,
+    noinline itemKey: (T, Int) -> Any? = { _, _ -> null },
+    noinline itemType: (T, Int) -> Any? = { _, _ -> null },
+    crossinline itemContent: @Composable LazyItemScope.(T, Int) -> Unit,
+) {
+    items(
+        size = items.size,
+        itemKey = { itemKey(items[it], it) },
+        itemType = { itemType(items[it], it) },
+        itemContent = { itemContent(items[it], it) }
+    )
+}
+
 private class LazyListCore(
     content: LazyListScope.() -> Unit,
     val state: LazyListStateImpl,
     val coroutineScope: CoroutineScope,
-) : LazyListScope, LazyItemScope, LazyLayoutItemProvider, LazyLayoutMeasurePolicy {
+) : LazyListScope, LazyLayoutItemProvider, LazyLayoutMeasurePolicy {
     class Items(
         val startIndex: Int,
         val size: Int,
@@ -174,13 +186,11 @@ private class LazyListCore(
             }
         }
         val subIndex = items.subIndex(index)
-        CompositionLocalProvider(
-            LocalLazyItemIndex provides index,
-            LocalLazySubItemIndex provides subIndex,
-        ) {
-            val itemContent = items.itemContent
-            itemContent(subIndex)
+        val itemContent = items.itemContent
+        val itemScope = remember(index, key) {
+            LazyItemScopeImpl(state.spec) { onItemGainFocus(index) }
         }
+        itemScope.itemContent(subIndex)
     }
 
     override fun getContentType(index: Int): Any? = indexTypeCache.getOrPut(index) {
@@ -256,7 +266,7 @@ private class LazyListCore(
     }
 
     fun requestSelectFocus(): Boolean {
-        return nodeChain?.selectNode?.focusRequester?.requestFocus() == true
+        return nodeChain?.selectNode?.requestFocus() ?: false
     }
 
     fun onScroll(scope: GraphicsLayerScope) {
@@ -269,32 +279,6 @@ private class LazyListCore(
         }
     }
 
-    @Composable
-    override fun Modifier.registerFocusable(
-        focusRequester: FocusRequester
-    ): Modifier {
-        val containerIndex = itemIndex
-        return onFocusChanged { if (it.hasFocus) onItemGainFocus(containerIndex) }
-            .focusRequester(focusRequester)
-            .then(LazyFocusableItemElement(focusRequester))
-    }
-
-    @Composable
-    override fun Modifier.itemFocusAnim(anim: GraphicsLayerScope.(Float) -> Unit): Modifier {
-        var hasFocus by remember { mutableStateOf(false) }
-        val progress by remember { derivedStateOf { if (hasFocus) 1f else 0f } }
-        val progressAnim by animateFloatAsState(progress, state.spec)
-        return onFocusChanged { hasFocus = it.hasFocus }
-            .graphicsLayer { anim(progressAnim) }
-    }
-
-    @Composable
-    override fun Modifier.itemFocusDecorate(block: ContentDrawScope.(Boolean) -> Unit): Modifier {
-        var hasFocus by remember { mutableStateOf(false) }
-        return onFocusChanged { hasFocus = it.hasFocus }
-            .drawWithContent { block(hasFocus) }
-    }
-
     private data class ItemNode(
         val index: Int = 0,
         val axisSize: Int = 0,
@@ -304,11 +288,12 @@ private class LazyListCore(
         var prev: ItemNode? = null,
         var next: ItemNode? = null,
     ) {
-        val parentData get() = placeable.parentData as? LazyParentData
-        val focusRequester get() = parentData?.focusRequester
-        val focusable get() = focusRequester != null
+        val parentData = (placeable.parentData as? LazyParentDataImpl) ?: LazyParentData
+        val focusable = parentData is LazyParentDataImpl
         val startEdge get() = offset
         val endEdge get() = offset + axisSize
+
+        fun requestFocus() = parentData.requestFocus()
     }
 
     private class NodeChain(
@@ -628,81 +613,103 @@ private class LazyListCore(
     }
 }
 
-val LocalLazySubItemIndex = compositionLocalOf { 0 }
-val LocalLazyItemIndex = compositionLocalOf { 0 }
-
-interface LazyItemScope {
-    val subItemIndex @Composable get() = LocalLazySubItemIndex.current
-    val itemIndex @Composable get() = LocalLazyItemIndex.current
+sealed interface LazyItemScope {
+    @Composable
+    fun Modifier.registerFocusable(): Modifier
 
     @Composable
-    fun Modifier.registerFocusable(
-        focusRequester: FocusRequester = remember { FocusRequester() }
-    ): Modifier
-
-    @Composable
-    fun Modifier.itemFocusAnim(anim: GraphicsLayerScope.(Float) -> Unit): Modifier
+    fun Modifier.itemFocusAnim(block: GraphicsLayerScope.(Float) -> Unit): Modifier
 
     @Composable
     fun Modifier.itemFocusDecorate(block: ContentDrawScope.(Boolean) -> Unit): Modifier
 
-    fun GraphicsLayerScope.scale(multiple: Float) {
-        scaleX = multiple
-        scaleY = multiple
-    }
-
     @Composable
-    fun Modifier.itemFocusScale(focus: Float = 1.15f, unfocus: Float = 1f): Modifier {
-        return itemFocusAnim { scale(it * (focus - unfocus) + unfocus) }
+    fun Modifier.itemFocusAnimByScale(focus: Float, unfocus: Float = 1f): Modifier {
+        return itemFocusAnim {
+            val multiple = it * (focus - unfocus) + unfocus
+            scaleX = multiple
+            scaleY = multiple
+        }
     }
 
     @Composable
     fun Modifier.itemFocusBorder(width: Dp, color: Color, shape: Shape): Modifier {
         return itemFocusDecorate {
             drawContent()
-            if (it) {
-                val outline = shape.createOutline(size, layoutDirection, this)
-                drawOutline(outline, color, 1f, Stroke(width.toPx()))
-            }
+            if (!it) return@itemFocusDecorate
+            val outline = shape.createOutline(size, layoutDirection, this)
+            drawOutline(outline, color, 1f, Stroke(width.toPx()))
         }
     }
 }
 
-private class LazyParentData(
-    var focusRequester: FocusRequester? = null,
-)
+private class LazyItemScopeImpl(
+    val spec: AnimationSpec<Float>,
+    val onItemGainFocus: () -> Unit
+) : LazyItemScope {
+    private var hasFocus: Boolean by mutableStateOf(false)
 
-private class LazyFocusableItemElement(
-    val focusRequester: FocusRequester
-) : ModifierNodeElement<LazyFocusableItemNode>() {
-    override fun create(): LazyFocusableItemNode {
-        return LazyFocusableItemNode(focusRequester)
+    @Composable
+    override fun Modifier.registerFocusable(): Modifier {
+        return onFocusChanged {
+            hasFocus = it.hasFocus
+            if (it.hasFocus) onItemGainFocus()
+        }.then(LazyFocusableItemElement)
     }
 
-    override fun update(node: LazyFocusableItemNode) {
-        node.focusRequester = focusRequester
+    @Composable
+    override fun Modifier.itemFocusAnim(block: GraphicsLayerScope.(Float) -> Unit): Modifier {
+        val progress by remember { derivedStateOf { if (hasFocus) 1f else 0f } }
+        val progressAnim by animateFloatAsState(progress, spec)
+        return graphicsLayer { block(progressAnim) }
     }
 
-    override fun hashCode(): Int {
-        return focusRequester.hashCode()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        return (other as? LazyFocusableItemElement)?.focusRequester == focusRequester
-    }
-
-    override fun InspectorInfo.inspectableProperties() {
-        properties["name"] = "LazyFocusableItemElement"
+    @Composable
+    override fun Modifier.itemFocusDecorate(block: ContentDrawScope.(Boolean) -> Unit): Modifier {
+        return drawWithContent { block(hasFocus) }
     }
 }
 
-private class LazyFocusableItemNode(
-    var focusRequester: FocusRequester
-) : Modifier.Node(), ParentDataModifierNode {
+private interface LazyParentData {
+    var requestFocus: () -> Boolean
+
+    fun release() {}
+
+    companion object : LazyParentData {
+        override var requestFocus = { false }
+    }
+}
+
+private class LazyParentDataImpl : LazyParentData {
+    override var requestFocus = LazyParentData.requestFocus
+
+    override fun release() {
+        requestFocus = LazyParentData.requestFocus
+    }
+}
+
+private object LazyFocusableItemElement : ModifierNodeElement<LazyFocusableItemNode>() {
+    override fun create(): LazyFocusableItemNode {
+        return LazyFocusableItemNode()
+    }
+
+    override fun update(node: LazyFocusableItemNode) {}
+
+    override fun hashCode(): Int = 0
+
+    override fun equals(other: Any?): Boolean = this === other
+
+    override fun InspectorInfo.inspectableProperties() {
+        properties["name"] = "LazyItemRegisterFocusableElement"
+    }
+}
+
+private class LazyFocusableItemNode : Modifier.Node(), FocusRequesterModifierNode,
+    ParentDataModifierNode {
     override fun Density.modifyParentData(parentData: Any?): Any {
-        val data = (parentData as? LazyParentData) ?: LazyParentData()
-        data.focusRequester = focusRequester
-        return data
+        val parentData = (parentData as? LazyParentDataImpl) ?: LazyParentDataImpl()
+        parentData.requestFocus = { requestFocus() }
+        return parentData
     }
 }
 
