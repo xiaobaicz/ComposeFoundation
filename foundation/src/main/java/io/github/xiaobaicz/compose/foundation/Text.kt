@@ -16,8 +16,10 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -39,8 +41,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
-import io.github.xiaobaicz.compose.foundation.theme.LocalContentColor
-import io.github.xiaobaicz.compose.foundation.theme.LocalTextStyle
 import kotlin.math.min
 
 @Composable
@@ -65,7 +65,7 @@ fun Text(
 ) {
     require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeStyle = style.merge(
-        color = color.takeOrElse { LocalContentColor.current },
+        color = color.takeOrElse { LocalTextColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
@@ -114,7 +114,7 @@ fun Text(
 ) {
     require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeStyle = style.merge(
-        color = color.takeOrElse { LocalContentColor.current },
+        color = color.takeOrElse { LocalTextColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
@@ -170,7 +170,7 @@ fun TextField(
 ) {
     require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
     val mergeTextStyle = textStyle.merge(
-        color = color.takeOrElse { LocalContentColor.current },
+        color = color.takeOrElse { LocalTextColor.current },
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
@@ -196,6 +196,24 @@ fun TextField(
         decorator = decorator,
         scrollState = scrollState,
     )
+}
+
+val LocalTextColor = compositionLocalOf { Color.Unspecified }
+
+@Composable
+fun ContentColorProvider(color: Color = Color.Unspecified, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalTextColor provides color) {
+        content()
+    }
+}
+
+val LocalTextStyle = compositionLocalOf { TextStyle.Default }
+
+@Composable
+fun TextStyleProvider(style: TextStyle = TextStyle.Default, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalTextStyle provides style) {
+        content()
+    }
 }
 
 val defaultLineHeightStyle = LineHeightStyle(

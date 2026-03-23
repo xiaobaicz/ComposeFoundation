@@ -10,12 +10,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import io.github.xiaobaicz.compose.foundation.theme.Theme
 
 @Composable
 fun Surface(
     modifier: Modifier = Modifier,
-    color: Color = Theme.colors.surface,
+    color: Color = Color.Unspecified,
     shape: Shape = RectangleShape,
     maxSize: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,

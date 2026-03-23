@@ -2,64 +2,71 @@ package io.github.xiaobaicz.compose.foundation
 
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.Role
-import io.github.xiaobaicz.compose.foundation.theme.ButtonDecorator
-import io.github.xiaobaicz.compose.foundation.theme.LocalButtonDecorator
 
-@Composable
-fun rememberButtonState(): ButtonState {
-    return remember { ButtonState() }
+enum class ButtonState {
+    Normal, Focused, Pressed, Selected, Disabled
 }
 
-class ButtonState {
-    var hasFocus by mutableStateOf(false)
-        internal set
+@Composable
+private fun InteractionSource.collectButtonStateAsState(
+    enabled: Boolean,
+    selected: Boolean
+): ButtonState {
+    val isFocused by collectIsFocusedAsState()
+    val isPressed by collectIsPressedAsState()
+
+    return when {
+        !enabled -> ButtonState.Disabled
+        isPressed -> ButtonState.Pressed
+        isFocused -> ButtonState.Focused
+        selected -> ButtonState.Selected
+        else -> ButtonState.Normal
+    }
 }
 
 @Composable
 fun Button(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    state: ButtonState = rememberButtonState(),
     decorator: ButtonDecorator = LocalButtonDecorator.current,
     interactionSource: MutableInteractionSource? = null,
     indication: Indication? = null,
     enabled: Boolean = true,
+    selected: Boolean = false,
     onClickLabel: String? = null,
     role: Role? = null,
     onLongClickLabel: String? = null,
     onLongClick: (() -> Unit)? = null,
     onDoubleClick: (() -> Unit)? = null,
     hapticFeedbackEnabled: Boolean = true,
-    content: @Composable ButtonState.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
+    val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     Box(
-        modifier = modifier
-            .onFocusChanged { state.hasFocus = it.hasFocus }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = indication,
-                enabled = enabled,
-                onClickLabel = onClickLabel,
-                role = role,
-                onLongClickLabel = onLongClickLabel,
-                onLongClick = onLongClick,
-                onDoubleClick = onDoubleClick,
-                hapticFeedbackEnabled = hapticFeedbackEnabled,
-                onClick = onClick
-            )
+        modifier = modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = indication,
+            enabled = enabled,
+            onClickLabel = onClickLabel,
+            role = role,
+            onLongClickLabel = onLongClickLabel,
+            onLongClick = onLongClick,
+            onDoubleClick = onDoubleClick,
+            hapticFeedbackEnabled = hapticFeedbackEnabled,
+            onClick = onClick
+        )
     ) {
-        with(decorator) {
-            state.Decoration(content)
-        }
+        val state = interactionSource.collectButtonStateAsState(enabled, selected)
+        decorator.Decoration(state, content)
     }
 }

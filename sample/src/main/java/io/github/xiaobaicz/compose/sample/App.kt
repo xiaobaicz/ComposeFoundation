@@ -16,13 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xiaobaicz.compose.foundation.Button
+import io.github.xiaobaicz.compose.foundation.ButtonStateColor
 import io.github.xiaobaicz.compose.foundation.Feature
+import io.github.xiaobaicz.compose.foundation.RoundButtonDecorator
 import io.github.xiaobaicz.compose.foundation.Skeleton
 import io.github.xiaobaicz.compose.foundation.Surface
 import io.github.xiaobaicz.compose.foundation.Text
 import io.github.xiaobaicz.compose.foundation.rememberSkeletonState
-import io.github.xiaobaicz.compose.foundation.theme.ButtonColor
-import io.github.xiaobaicz.compose.foundation.theme.RoundButtonDecorator
 import io.github.xiaobaicz.compose.foundation.tv.lazy.LazyList
 import io.github.xiaobaicz.compose.foundation.tv.lazy.rememberLazyColumnState
 import io.github.xiaobaicz.compose.foundation.tv.lazy.rememberLazyRowState
@@ -62,7 +62,8 @@ fun TVApp() {
                 horizontal = 64.dp,
                 vertices = 0.dp,
                 radius = 32.dp,
-                buttonColor = ButtonColor(Color.Yellow, Color.Gray, Color.Black, Color.White)
+                textColor = ButtonStateColor(Color.White, Color.Black),
+                background = ButtonStateColor(Color.Gray, Color.Yellow),
             )
         }
 
