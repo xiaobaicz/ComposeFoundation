@@ -106,14 +106,14 @@ inline fun <T> LazyListScope.items(
 
 inline fun <T> LazyListScope.itemsIndexed(
     items: List<T>,
-    noinline itemKey: (T, Int) -> Any? = { _, _ -> null },
-    noinline itemType: (T, Int) -> Any? = { _, _ -> null },
+    noinline itemKey: (T) -> Any? = { null },
+    noinline itemType: (T) -> Any? = { null },
     crossinline itemContent: @Composable LazyItemScope.(T, Int) -> Unit,
 ) {
     items(
         size = items.size,
-        itemKey = { itemKey(items[it], it) },
-        itemType = { itemType(items[it], it) },
+        itemKey = { itemKey(items[it]) },
+        itemType = { itemType(items[it]) },
         itemContent = { itemContent(items[it], it) }
     )
 }
