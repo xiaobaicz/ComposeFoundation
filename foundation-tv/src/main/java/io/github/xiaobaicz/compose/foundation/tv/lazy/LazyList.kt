@@ -900,6 +900,7 @@ fun LazyList(
     content: LazyListScope.() -> Unit,
 ) {
     val state by rememberUpdatedState(state)
+    val content by rememberUpdatedState(content)
     val coroutineScope = rememberCoroutineScope()
     val core by remember {
         derivedStateOf {
