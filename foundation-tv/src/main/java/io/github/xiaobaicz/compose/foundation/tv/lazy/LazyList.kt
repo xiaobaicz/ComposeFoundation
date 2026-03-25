@@ -187,9 +187,7 @@ private class LazyListCore(
         }
         val subIndex = items.subIndex(index)
         val itemContent = items.itemContent
-        val itemScope = remember(index, key) {
-            LazyItemScopeImpl(state.spec) { onItemGainFocus(index) }
-        }
+        val itemScope = LazyItemScopeImpl(state.spec) { onItemGainFocus(index) }
         itemScope.itemContent(subIndex)
     }
 
