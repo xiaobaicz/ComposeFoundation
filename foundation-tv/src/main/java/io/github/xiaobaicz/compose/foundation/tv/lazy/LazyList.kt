@@ -255,7 +255,7 @@ private class LazyListCore(
             chain.selectNode.index == index -> return
             chain.prevNode?.index == index -> startScrollAnim(index, chain.forward)
             chain.nextNode?.index == index -> startScrollAnim(index, chain.backward)
-            else -> chain.selectNode.requestFocus()
+            else -> throw IllegalStateException("Please manually change the focus via state. (current: ${chain.selectNode.index} - select: $index)")
         }
     }
 
