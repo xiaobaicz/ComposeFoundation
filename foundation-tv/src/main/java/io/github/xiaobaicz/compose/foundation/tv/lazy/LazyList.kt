@@ -34,8 +34,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusEnterExitScope
+import androidx.compose.ui.focus.FocusEventModifierNode
 import androidx.compose.ui.focus.FocusProperties
 import androidx.compose.ui.focus.FocusRequesterModifierNode
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.requestFocus
@@ -142,7 +145,7 @@ private class LazyListCore(
 
     private val layout = if (state.vertical) LayoutByColumn() else LayoutByRow()
 
-    private var nodeChain: NodeChain? = null
+    private val chain = NodeChain()
 
     private var ltr = true
 
@@ -213,17 +216,42 @@ private class LazyListCore(
     override var itemCount: Int = 0
 
     override fun LazyLayoutMeasureScope.measure(constraints: Constraints): MeasureResult {
+        animInProgress = true
+        state.composerStart()
+        ltr = layoutDirection == LayoutDirection.Ltr
+        chain.clear()
         return with(layout) { measure(constraints, state) }
     }
 
     fun onFocusRestore(properties: FocusProperties) {
         with(properties) {
-            onEnter = { if (!requestSelectFocus()) cancelFocusChange() }
+            onEnter = { onFocusEnter() }
         }
     }
 
-    private fun startScrollAnim(index: Int, offset: Int) {
+    fun FocusEnterExitScope.onFocusEnter() {
+        if (chain.isNotEmpty) {
+            if (chain.select.requestFocus()) return
+            var target = chain.select.next
+            while (target != null) {
+                if (target.requestFocus()) return
+                target = target.next
+            }
+            target = chain.select.prev
+            while (target != null) {
+                if (target.requestFocus()) return
+                target = target.next
+            }
+        }
+        cancelFocusChange()
+    }
+
+    private fun startScrollAnim(index: Int, offset: Int, skip: Boolean = false) {
         animInProgress = true
+        if (skip) {
+            state.select = index
+            return
+        }
         coroutineScope.launch {
             try {
                 startAnim { animOffset = it * offset }
@@ -250,12 +278,12 @@ private class LazyListCore(
     }
 
     fun onItemGainFocus(index: Int) {
-        val chain = nodeChain ?: return
+        if (chain.isEmpty) return
         when {
-            chain.selectNode.index == index -> return
-            chain.prevNode?.index == index -> startScrollAnim(index, chain.forward)
-            chain.nextNode?.index == index -> startScrollAnim(index, chain.backward)
-            else -> throw IllegalStateException("Please manually change the focus via state. (current: ${chain.selectNode.index} - select: $index)")
+            chain.select.index == index -> return
+            chain.prev?.index == index -> startScrollAnim(index, chain.forward)
+            chain.next?.index == index -> startScrollAnim(index, chain.backward)
+            else -> startScrollAnim(index, 0, true)
         }
     }
 
@@ -264,7 +292,8 @@ private class LazyListCore(
     }
 
     fun requestSelectFocus(): Boolean {
-        return nodeChain?.selectNode?.requestFocus() ?: false
+        if (chain.isEmpty) return false
+        return chain.select.requestFocus()
     }
 
     fun onScroll(scope: GraphicsLayerScope) {
@@ -286,37 +315,73 @@ private class LazyListCore(
         var prev: ItemNode? = null,
         var next: ItemNode? = null,
     ) {
-        val parentData = (placeable.parentData as? LazyParentDataImpl) ?: LazyParentData
-        val focusable = parentData is LazyParentDataImpl
+        val parentData = (placeable.parentData as? LazyParentData) ?: LazyParentData.EmptyNode
+        val focusable = parentData.focusableNode != null
         val startEdge get() = offset
         val endEdge get() = offset + axisSize
 
-        fun requestFocus() = parentData.requestFocus()
+        fun requestFocus(): Boolean {
+            val node = parentData.focusableNode
+            if (node == null || !node.isAttached) return false
+            return node.requestFocus()
+        }
     }
 
     private class NodeChain(
-        val selectNode: ItemNode,
-        var firstNode: ItemNode = selectNode,
-        var lastNode: ItemNode = selectNode,
-        var prevNode: ItemNode? = null,
-        var nextNode: ItemNode? = null,
+        private var selectOrNull: ItemNode? = null,
+        private var firstOrNull: ItemNode? = selectOrNull,
+        private var lastOrNull: ItemNode? = selectOrNull,
+        var prev: ItemNode? = null,
+        var next: ItemNode? = null,
         var forward: Int = 0,
         var backward: Int = 0,
     ) {
-        inline fun prevNode(block: NodeChain.(ItemNode) -> Unit) {
-            prevNode?.also { block(it) }
+        val cache = arrayMapOf<Int, ItemNode>()
+
+        var select
+            get() = selectOrNull!!
+            set(value) {
+                selectOrNull = value
+                first = value
+                last = value
+            }
+        var first
+            get() = firstOrNull!!
+            set(value) {
+                firstOrNull = value
+            }
+        var last
+            get() = lastOrNull!!
+            set(value) {
+                lastOrNull = value
+            }
+
+        val isEmpty get() = selectOrNull == null
+        val isNotEmpty get() = !isEmpty
+
+        inline fun prev(block: NodeChain.(ItemNode) -> Unit) {
+            prev?.also { block(it) }
         }
 
-        inline fun nextNode(block: NodeChain.(ItemNode) -> Unit) {
-            nextNode?.also { block(it) }
+        inline fun next(block: NodeChain.(ItemNode) -> Unit) {
+            next?.also { block(it) }
         }
 
         inline fun forEach(block: (ItemNode) -> Unit) {
-            var next: ItemNode? = firstNode
+            var next: ItemNode? = first
             while (next != null) {
                 block(next)
                 next = next.next
             }
+        }
+
+        inline fun findFirst(block: (ItemNode) -> Boolean): ItemNode? {
+            var next: ItemNode? = first
+            while (next != null) {
+                if (block(next)) return next
+                next = next.next
+            }
+            return null
         }
 
         fun axisSize(): Int {
@@ -334,13 +399,32 @@ private class LazyListCore(
         fun offsetPlus(offset: Int) {
             forEach { it.offset += offset }
         }
+
+        fun reset() {
+            selectOrNull = null
+            firstOrNull = null
+            lastOrNull = null
+            prev = null
+            next = null
+            forward = 0
+            backward = 0
+        }
+
+        fun clear() {
+            reset()
+            cache.clear()
+        }
     }
 
     private abstract inner class Layout {
         abstract val IntrinsicMeasureScope.paddingStart: Int
         abstract val IntrinsicMeasureScope.paddingEnd: Int
 
-        abstract fun LazyLayoutMeasureScope.createNode(const: Constraints, index: Int): ItemNode
+        fun LazyLayoutMeasureScope.createNode(const: Constraints, index: Int): ItemNode {
+            return chain.cache.getOrPut(index) { onCreateNode(const, index) }
+        }
+
+        abstract fun LazyLayoutMeasureScope.onCreateNode(const: Constraints, index: Int): ItemNode
 
         fun LazyLayoutMeasureScope.createNodeChain(constraints: Constraints): NodeChain {
             val selectIndex = state.select.coerceIn(0, itemCount - 1)
@@ -349,78 +433,77 @@ private class LazyListCore(
             val windowOffset = state.windowOffset * containerAxisSize(constraints)
             val selectNodeOffset = selectNode.axisSize * state.itemOffset
             selectNode.offset = (windowOffset - selectNodeOffset).roundToInt()
-            return NodeChain(selectNode).also { nodeChain = it }
+            chain.reset()
+            return chain.also { it.select = selectNode }
         }
 
         fun LazyLayoutMeasureScope.fillStartEdge(
             constraints: Constraints,
-            nodeChain: NodeChain,
             condition: (ItemNode) -> Boolean
         ) {
             val spacing = state.spacing.roundToPx()
             while (true) {
-                val firstNode = nodeChain.firstNode
-                if (nodeChain.selectNode !== firstNode && condition(firstNode)) break
+                val firstNode = chain.first
+                if (chain.select !== firstNode && condition(firstNode)) break
                 if (firstNode.index - 1 < 0) break
                 val prevNode = createNode(constraints, firstNode.index - 1)
                 prevNode.offset = firstNode.startEdge - spacing - prevNode.axisSize
                 firstNode.prev = prevNode
                 prevNode.next = firstNode
-                nodeChain.firstNode = prevNode
+                chain.first = prevNode
             }
         }
 
-        fun LazyLayoutMeasureScope.fillStartEdge(constraints: Constraints, nodeChain: NodeChain) {
+        fun LazyLayoutMeasureScope.fillStartEdge(constraints: Constraints) {
             val containerAxisSize = containerAxisSize(constraints)
             val windowOffset = containerAxisSize * state.windowOffset
             val limit = windowOffset.roundToInt()
-            val edge = (nodeChain.selectNode.startEdge - limit).coerceAtMost(0)
+            val edge = (chain.select.startEdge - limit).coerceAtMost(0)
             val maxEdge = edge - paddingStart
-            fillStartEdge(constraints, nodeChain) { it.startEdge <= maxEdge }
+            fillStartEdge(constraints) { it.startEdge <= maxEdge }
         }
 
         fun LazyLayoutMeasureScope.fillEndEdge(
             constraints: Constraints,
-            nodeChain: NodeChain,
             condition: (ItemNode) -> Boolean
         ) {
             val spacing = state.spacing.roundToPx()
             while (true) {
-                val lastNode = nodeChain.lastNode
-                if (nodeChain.selectNode !== lastNode && condition(lastNode)) break
+                val lastNode = chain.last
+                if (chain.select !== lastNode && condition(lastNode)) break
                 if (lastNode.index + 1 >= itemCount) break
                 val nextNode = createNode(constraints, lastNode.index + 1)
                 nextNode.offset = lastNode.endEdge + spacing
                 lastNode.next = nextNode
                 nextNode.prev = lastNode
-                nodeChain.lastNode = nextNode
+                chain.last = nextNode
             }
         }
 
-        fun LazyLayoutMeasureScope.fillEndEdge(constraints: Constraints, nodeChain: NodeChain) {
+        fun LazyLayoutMeasureScope.fillEndEdge(constraints: Constraints) {
             val containerAxisSize = containerAxisSize(constraints)
             val windowOffset = containerAxisSize * state.windowOffset
             val limit = (containerAxisSize - windowOffset).roundToInt()
-            val edge = (nodeChain.selectNode.endEdge + limit).coerceAtLeast(containerAxisSize)
+            val edge = (chain.select.endEdge + limit).coerceAtLeast(containerAxisSize)
             val maxEdge = edge + paddingEnd
-            fillEndEdge(constraints, nodeChain) { it.endEdge >= maxEdge }
+            fillEndEdge(constraints) { it.endEdge >= maxEdge }
         }
 
         abstract fun containerAxisSize(constraints: Constraints): Int
 
-        fun move2StartEdge(nodeChain: NodeChain): Boolean {
-            if (nodeChain.firstNode.startEdge > 0) {
-                val offset = 0 - nodeChain.firstNode.startEdge
-                nodeChain.offsetPlus(offset)
+        fun move2StartEdge(): Boolean {
+            if (chain.first.startEdge > 0) {
+                val offset = 0 - chain.first.startEdge
+                chain.offsetPlus(offset)
                 return true
             }
             return false
         }
 
-        fun move2EndEdge(nodeChain: NodeChain, edge: Int): Boolean {
-            if (nodeChain.lastNode.endEdge < edge) {
-                val offset = edge - nodeChain.lastNode.endEdge
-                nodeChain.offsetPlus(offset)
+        fun move2EndEdge(edge: Int): Boolean {
+            if (chain.last.endEdge < edge) {
+                val offset = edge - chain.last.endEdge
+                chain.offsetPlus(offset)
                 return true
             }
             return false
@@ -428,103 +511,107 @@ private class LazyListCore(
 
         fun LazyLayoutMeasureScope.measure(
             constraints: Constraints,
-            state: LazyListStateImpl
+            state: LazyListStateImpl,
         ): MeasureResult {
-            animInProgress = true
-            state.composerStart()
-            ltr = layoutDirection == LayoutDirection.Ltr
-            nodeChain = null
-
+            chain.reset()
             if (itemCount < 1) return layout(constraints.minWidth, constraints.minHeight) {
                 onLayoutEnd()
             }
             val childConst = constraints.copy(minWidth = 0, minHeight = 0)
-            val nodeChain = createNodeChain(childConst)
+            createNodeChain(childConst)
 
             val containerAxisSize = containerAxisSize(childConst)
 
             var hasNext = false
-            fillEndEdge(childConst, nodeChain) { node ->
+            fillEndEdge(childConst) { node ->
                 node.focusable.also { hasNext = it }
             }
-            nodeChain.nextNode = if (hasNext) nodeChain.lastNode else null
+            chain.next = if (hasNext) chain.last else null
 
             var hasPrev = false
-            fillStartEdge(childConst, nodeChain) { node ->
+            fillStartEdge(childConst) { node ->
                 node.focusable.also { hasPrev = it }
             }
-            nodeChain.prevNode = if (hasPrev) nodeChain.firstNode else null
+            chain.prev = if (hasPrev) chain.first else null
 
             when (state.keyline) {
                 Keyline.BothEdge -> {
-                    nodeChain.nextNode { fillEndEdge(childConst, this) }
-                    move2EndEdge(nodeChain, containerAxisSize)
-                    nodeChain.prevNode { fillStartEdge(childConst, this) }
-                    if (move2StartEdge(nodeChain)) {
-                        nodeChain.nextNode { fillEndEdge(childConst, this) }
+                    chain.next { fillEndEdge(childConst) }
+                    move2EndEdge(containerAxisSize)
+                    chain.prev { fillStartEdge(childConst) }
+                    if (move2StartEdge()) {
+                        chain.next { fillEndEdge(childConst) }
                     }
-                    nodeChain.prevNode {
-                        val maxForward = firstNode.startEdge.coerceAtMost(0)
-                        val maxBackward = (lastNode.endEdge - containerAxisSize).coerceAtLeast(0)
+                    chain.prev {
+                        val maxForward = first.startEdge.coerceAtMost(0)
+                        val maxBackward = (last.endEdge - containerAxisSize).coerceAtLeast(0)
                         val forward = calculateScrollOffset(childConst, it)
                         this.forward = min(maxBackward, max(maxForward, forward))
                     }
-                    nodeChain.nextNode {
-                        val maxForward = firstNode.startEdge.coerceAtMost(0)
-                        val maxBackward = (lastNode.endEdge - containerAxisSize).coerceAtLeast(0)
+                    chain.next {
+                        val maxForward = first.startEdge.coerceAtMost(0)
+                        val maxBackward = (last.endEdge - containerAxisSize).coerceAtLeast(0)
                         val backward = calculateScrollOffset(childConst, it)
                         this.backward = max(maxForward, min(maxBackward, backward))
                     }
                 }
 
                 Keyline.StartEdge -> {
-                    nodeChain.prevNode { fillStartEdge(childConst, this) }
-                    move2StartEdge(nodeChain)
-                    nodeChain.nextNode { fillEndEdge(childConst, this) }
-                    nodeChain.prevNode {
-                        val maxForward = firstNode.startEdge.coerceAtMost(0)
+                    chain.prev { fillStartEdge(childConst) }
+                    move2StartEdge()
+                    chain.next { fillEndEdge(childConst) }
+                    chain.prev {
+                        val maxForward = first.startEdge.coerceAtMost(0)
                         val forward = calculateScrollOffset(childConst, it)
                         this.forward = max(maxForward, forward)
                     }
-                    nodeChain.nextNode {
+                    chain.next {
                         this.backward = calculateScrollOffset(childConst, it).coerceAtLeast(0)
                     }
                 }
 
                 Keyline.EndEdge -> {
-                    nodeChain.nextNode { fillEndEdge(childConst, this) }
-                    move2EndEdge(nodeChain, containerAxisSize)
-                    nodeChain.prevNode {
-                        fillStartEdge(childConst, this)
+                    chain.next { fillEndEdge(childConst) }
+                    move2EndEdge(containerAxisSize)
+                    chain.prev {
+                        fillStartEdge(childConst)
                         this.forward = calculateScrollOffset(childConst, it).coerceAtMost(0)
                     }
-                    nodeChain.nextNode {
-                        val maxBackward = (lastNode.endEdge - containerAxisSize).coerceAtLeast(0)
+                    chain.next {
+                        val maxBackward = (last.endEdge - containerAxisSize).coerceAtLeast(0)
                         val backward = calculateScrollOffset(childConst, it)
                         this.backward = min(maxBackward, backward)
                     }
                 }
 
                 Keyline.NoEdge -> {
-                    nodeChain.prevNode { fillStartEdge(childConst, this) }
-                    nodeChain.nextNode { fillEndEdge(childConst, this) }
-                    nodeChain.prevNode {
+                    chain.prev { fillStartEdge(childConst) }
+                    chain.next { fillEndEdge(childConst) }
+                    chain.prev {
                         this.forward = calculateScrollOffset(childConst, it).coerceAtMost(0)
                     }
-                    nodeChain.nextNode {
+                    chain.next {
                         this.backward = calculateScrollOffset(childConst, it).coerceAtLeast(0)
                     }
                 }
             }
 
-            return layout(constraints, nodeChain) {
+            val focusNode = chain.findFirst { it.parentData.focusableNode?.hasFocus == true }
+            if (focusNode != null) {
+                if (focusNode.index != chain.select.index) {
+                    state.select = focusNode.index
+                    return measure(constraints, state)
+                }
+                requestSelectFocus()
+            }
+
+            return layout(constraints) {
                 onLayoutEnd()
             }
         }
 
         abstract fun LazyLayoutMeasureScope.layout(
             constraints: Constraints,
-            nodeChain: NodeChain,
             layoutEnd: () -> Unit
         ): MeasureResult
 
@@ -548,10 +635,7 @@ private class LazyListCore(
         override val IntrinsicMeasureScope.paddingEnd: Int
             get() = state.contentPadding.calculateBottomPadding().roundToPx()
 
-        override fun LazyLayoutMeasureScope.createNode(
-            const: Constraints,
-            index: Int
-        ): ItemNode {
+        override fun LazyLayoutMeasureScope.onCreateNode(const: Constraints, index: Int): ItemNode {
             val placeableList = compose(index).map { it.measure(const) }
             if (placeableList.size != 1) throw PlaceableQuantityException(index)
             val placeable = placeableList.first()
@@ -564,13 +648,12 @@ private class LazyListCore(
 
         override fun LazyLayoutMeasureScope.layout(
             constraints: Constraints,
-            nodeChain: NodeChain,
             layoutEnd: () -> Unit
         ): MeasureResult {
-            val width = constraints.constrainWidth(nodeChain.crossSize())
-            val height = constraints.constrainHeight(nodeChain.axisSize())
+            val width = constraints.constrainWidth(chain.crossSize())
+            val height = constraints.constrainHeight(chain.axisSize())
             return layout(width, height) {
-                nodeChain.forEach { it.placeable.placeRelative(0, it.offset) }
+                chain.forEach { it.placeable.placeRelative(0, it.offset) }
                 layoutEnd()
             }
         }
@@ -582,10 +665,7 @@ private class LazyListCore(
         override val IntrinsicMeasureScope.paddingEnd: Int
             get() = state.contentPadding.calculateEndPadding(layoutDirection).roundToPx()
 
-        override fun LazyLayoutMeasureScope.createNode(
-            const: Constraints,
-            index: Int
-        ): ItemNode {
+        override fun LazyLayoutMeasureScope.onCreateNode(const: Constraints, index: Int): ItemNode {
             val placeableList = compose(index).map { it.measure(const) }
             if (placeableList.size != 1) throw PlaceableQuantityException(index)
             val placeable = placeableList.first()
@@ -598,13 +678,12 @@ private class LazyListCore(
 
         override fun LazyLayoutMeasureScope.layout(
             constraints: Constraints,
-            nodeChain: NodeChain,
             layoutEnd: () -> Unit
         ): MeasureResult {
-            val width = constraints.constrainWidth(nodeChain.axisSize())
-            val height = constraints.constrainHeight(nodeChain.crossSize())
+            val width = constraints.constrainWidth(chain.axisSize())
+            val height = constraints.constrainHeight(chain.crossSize())
             return layout(width, height) {
-                nodeChain.forEach { it.placeable.placeRelative(it.offset, 0) }
+                chain.forEach { it.placeable.placeRelative(it.offset, 0) }
                 layoutEnd()
             }
         }
@@ -668,21 +747,11 @@ private class LazyItemScopeImpl(
     }
 }
 
-private interface LazyParentData {
-    var requestFocus: () -> Boolean
-
-    fun release() {}
-
-    companion object : LazyParentData {
-        override var requestFocus = { false }
-    }
-}
-
-private class LazyParentDataImpl : LazyParentData {
-    override var requestFocus = LazyParentData.requestFocus
-
-    override fun release() {
-        requestFocus = LazyParentData.requestFocus
+private class LazyParentData(
+    var focusableNode: LazyFocusableItemNode? = null
+) {
+    companion object {
+        val EmptyNode = LazyParentData()
     }
 }
 
@@ -702,12 +771,21 @@ private object LazyFocusableItemElement : ModifierNodeElement<LazyFocusableItemN
     }
 }
 
-private class LazyFocusableItemNode : Modifier.Node(), FocusRequesterModifierNode,
+private class LazyFocusableItemNode : Modifier.Node(),
+    FocusRequesterModifierNode,
+    FocusEventModifierNode,
     ParentDataModifierNode {
+    var hasFocus = false
+        private set
+
     override fun Density.modifyParentData(parentData: Any?): Any {
-        val parentData = (parentData as? LazyParentDataImpl) ?: LazyParentDataImpl()
-        parentData.requestFocus = { requestFocus() }
+        val parentData = (parentData as? LazyParentData) ?: LazyParentData()
+        parentData.focusableNode = this@LazyFocusableItemNode
         return parentData
+    }
+
+    override fun onFocusEvent(focusState: FocusState) {
+        hasFocus = focusState.hasFocus
     }
 }
 
