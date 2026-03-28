@@ -8,6 +8,8 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -21,16 +23,19 @@ enum class ButtonState {
 private fun InteractionSource.collectButtonStateAsState(
     enabled: Boolean,
     selected: Boolean
-): ButtonState {
+): State<ButtonState> {
     val isFocused by collectIsFocusedAsState()
     val isPressed by collectIsPressedAsState()
-
-    return when {
-        !enabled -> ButtonState.Disabled
-        isPressed -> ButtonState.Pressed
-        isFocused -> ButtonState.Focused
-        selected -> ButtonState.Selected
-        else -> ButtonState.Normal
+    return remember {
+        derivedStateOf {
+            when {
+                !enabled -> ButtonState.Disabled
+                isPressed -> ButtonState.Pressed
+                isFocused -> ButtonState.Focused
+                selected -> ButtonState.Selected
+                else -> ButtonState.Normal
+            }
+        }
     }
 }
 
@@ -39,7 +44,7 @@ fun Button(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     decorator: ButtonDecorator = LocalButtonDecorator.current,
-    interactionSource: MutableInteractionSource? = null,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     indication: Indication? = null,
     enabled: Boolean = true,
     selected: Boolean = false,
@@ -51,7 +56,6 @@ fun Button(
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier.combinedClickable(
             interactionSource = interactionSource,
@@ -66,7 +70,7 @@ fun Button(
             onClick = onClick
         )
     ) {
-        val state = interactionSource.collectButtonStateAsState(enabled, selected)
+        val state by interactionSource.collectButtonStateAsState(enabled, selected)
         decorator.Decoration(state, content)
     }
 }
