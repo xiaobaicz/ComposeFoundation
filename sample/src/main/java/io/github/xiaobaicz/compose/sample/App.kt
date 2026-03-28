@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -24,6 +22,7 @@ import io.github.xiaobaicz.compose.foundation.Surface
 import io.github.xiaobaicz.compose.foundation.Text
 import io.github.xiaobaicz.compose.foundation.rememberSkeletonState
 import io.github.xiaobaicz.compose.foundation.tv.lazy.LazyList
+import io.github.xiaobaicz.compose.foundation.tv.lazy.itemsIndexed
 import io.github.xiaobaicz.compose.foundation.tv.lazy.rememberLazyColumnState
 import io.github.xiaobaicz.compose.foundation.tv.lazy.rememberLazyRowState
 import kotlinx.coroutines.cancel
@@ -44,16 +43,26 @@ fun App() {
 fun TVApp() {
     val skeletonState = rememberSkeletonState()
     Skeleton(skeletonState) {
-        var size by remember { mutableIntStateOf(0) }
+        val data = remember { mutableStateListOf<Int>() }
+
         val columnState = rememberLazyColumnState()
+
+        LaunchedEffect(data) {
+            columnState.composerEnd.collect {
+                if (columnState.requestFocus()) cancel()
+            }
+        }
 
         LaunchedEffect(Unit) {
             delay(2000L)
-            size = 40
             skeletonState.complete()
+            repeat(40) {
+                data.add(it)
+            }
 
-            columnState.composerEnd.collect {
-                if (columnState.requestFocus()) cancel()
+            repeat(20) {
+                delay(5000L)
+                data.removeAt(0)
             }
         }
 
@@ -68,7 +77,7 @@ fun TVApp() {
         }
 
         LazyList(state = columnState, modifier = Modifier.fillMaxSize()) {
-            items(size) { r ->
+            itemsIndexed(data, itemKey = { it }) { v, r ->
                 LazyList(
                     state = rememberLazyRowState(
                         clip = false,
@@ -87,7 +96,7 @@ fun TVApp() {
                                 .itemFocusAnimByScale(1.15f)
                                 .itemFocusBorder(2.dp, Color.Red, RoundedCornerShape(32.dp))
                         ) {
-                            Text("$r: $c", lineHeight = 150.sp)
+                            Text("$v: $c", lineHeight = 150.sp)
                         }
                     }
                 }
