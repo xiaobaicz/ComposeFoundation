@@ -34,9 +34,9 @@ fun ButtonDecoratorProvider(decorator: ButtonDecorator, content: @Composable () 
 @Immutable
 class ButtonStateColor(
     @Stable val normal: Color = Color.Unspecified,
-    @Stable val focused: Color = Color.Unspecified,
-    @Stable val pressed: Color = Color.Unspecified,
-    @Stable val selected: Color = Color.Unspecified,
+    @Stable val focused: Color = normal,
+    @Stable val pressed: Color = focused,
+    @Stable val selected: Color = focused,
     @Stable val disabled: Color = Color.Unspecified,
 ) {
     fun current(state: ButtonState): Color {
