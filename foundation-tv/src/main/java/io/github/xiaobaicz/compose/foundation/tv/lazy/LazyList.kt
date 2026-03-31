@@ -323,6 +323,7 @@ private class LazyListCore(
         fun requestFocus(): Boolean {
             val node = parentData.focusableNode
             if (node == null || !node.isAttached) return false
+            if (node.hasFocus) return true
             return node.requestFocus()
         }
     }
