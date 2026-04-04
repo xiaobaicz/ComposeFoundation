@@ -34,7 +34,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.takeOrElse
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
@@ -55,6 +57,7 @@ fun Text(
     lineHeight: TextUnit = if (fontSize.isUnspecified) TextUnit.Unspecified else fontSize * lineHeightFactor,
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
+    textDirection: TextDirection = TextDirection.Unspecified,
     shadow: Shadow? = null,
     style: TextStyle = LocalTextStyle.current,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
@@ -72,6 +75,7 @@ fun Text(
         lineHeight = lineHeight,
         lineHeightStyle = lineHeightStyle,
         textAlign = textAlign,
+        textDirection = textDirection.takeOrElse { style.textDirection.takeOrElse { TextDirection.Content } },
         shadow = shadow,
     )
     val autoSize = remember(mergeStyle.fontSize, mergeStyle.lineHeight, lineHeightFactor) {
@@ -103,6 +107,7 @@ fun Text(
     lineHeight: TextUnit = if (fontSize.isUnspecified) TextUnit.Unspecified else fontSize * lineHeightFactor,
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
+    textDirection: TextDirection = TextDirection.Unspecified,
     shadow: Shadow? = null,
     style: TextStyle = LocalTextStyle.current,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
@@ -121,6 +126,7 @@ fun Text(
         lineHeight = lineHeight,
         lineHeightStyle = lineHeightStyle,
         textAlign = textAlign,
+        textDirection = textDirection.takeOrElse { style.textDirection.takeOrElse { TextDirection.Content } },
         shadow = shadow,
     )
     val autoSize = remember(mergeStyle.fontSize, mergeStyle.lineHeight, lineHeightFactor) {
@@ -156,6 +162,7 @@ fun TextField(
     lineHeight: TextUnit = if (fontSize.isUnspecified) TextUnit.Unspecified else fontSize * lineHeightFactor,
     lineHeightStyle: LineHeightStyle = defaultLineHeightStyle,
     textAlign: TextAlign = TextAlign.Unspecified,
+    textDirection: TextDirection = TextDirection.Unspecified,
     shadow: Shadow? = null,
     textStyle: TextStyle = LocalTextStyle.current,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -177,6 +184,7 @@ fun TextField(
         lineHeight = lineHeight,
         lineHeightStyle = lineHeightStyle,
         textAlign = textAlign,
+        textDirection = textDirection.takeOrElse { textStyle.textDirection.takeOrElse { TextDirection.Content } },
         shadow = shadow,
     )
     BasicTextField(
