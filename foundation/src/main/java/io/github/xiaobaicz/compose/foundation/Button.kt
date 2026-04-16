@@ -12,6 +12,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 
@@ -26,6 +27,8 @@ private fun InteractionSource.collectButtonStateAsState(
 ): State<ButtonState> {
     val isFocused by collectIsFocusedAsState()
     val isPressed by collectIsPressedAsState()
+    val enabled by rememberUpdatedState(enabled)
+    val selected by rememberUpdatedState(selected)
     return remember {
         derivedStateOf {
             when {
