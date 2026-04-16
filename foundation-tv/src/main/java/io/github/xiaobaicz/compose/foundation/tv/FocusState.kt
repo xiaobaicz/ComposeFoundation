@@ -10,8 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.FocusRequester.Companion.FocusRequesterFactory.component1
-import androidx.compose.ui.focus.FocusRequester.Companion.FocusRequesterFactory.component2
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -65,15 +63,9 @@ private class FocusGroupStateImpl(
 }
 
 @Composable
-fun rememberFocusGroupState(): FocusGroupState {
-    val (group, fallback) = remember { FocusRequester.createRefs() }
-    return rememberFocusGroupState(group, fallback)
-}
-
-@Composable
 fun rememberFocusGroupState(
-    groupFocus: FocusRequester,
-    fallbackFocus: FocusRequester,
+    groupFocus: FocusRequester = remember { FocusRequester() },
+    fallbackFocus: FocusRequester = remember { FocusRequester() },
 ): FocusGroupState {
     return remember { FocusGroupStateImpl(groupFocus, fallbackFocus) }
 }
