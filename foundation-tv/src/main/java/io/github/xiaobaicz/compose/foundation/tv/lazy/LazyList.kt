@@ -240,7 +240,7 @@ private class LazyListCore(
             target = chain.select.prev
             while (target != null) {
                 if (target.requestFocus()) return
-                target = target.next
+                target = target.prev
             }
         }
         cancelFocusChange()
