@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -33,11 +34,11 @@ fun ButtonDecoratorProvider(decorator: ButtonDecorator, content: @Composable () 
 
 @Immutable
 class ButtonStateColor(
-    @Stable val normal: Color = Color.Unspecified,
-    @Stable val focused: Color = normal,
-    @Stable val pressed: Color = focused,
-    @Stable val selected: Color = focused,
-    @Stable val disabled: Color = Color.Unspecified,
+    val normal: Color = Color.Unspecified,
+    val focused: Color = normal,
+    val pressed: Color = focused,
+    val selected: Color = focused,
+    val disabled: Color = Color.Unspecified,
 ) {
     fun current(state: ButtonState): Color {
         return when (state) {
@@ -70,23 +71,23 @@ fun TextButtonDecorator(
 @Stable
 fun TextButtonDecorator(
     horizontal: Dp = Dp.Unspecified,
-    vertices: Dp = Dp.Unspecified,
+    vertical: Dp = Dp.Unspecified,
     textColor: ButtonStateColor = ButtonStateColor.Unspecified
 ) = TextButtonDecorator(
     start = horizontal,
-    top = vertices,
+    top = vertical,
     end = horizontal,
-    bottom = vertices,
+    bottom = vertical,
     textColor = textColor,
 )
 
 @Immutable
 class TextButtonDecorator(
-    @Stable val start: Dp = Dp.Unspecified,
-    @Stable val top: Dp = Dp.Unspecified,
-    @Stable val end: Dp = Dp.Unspecified,
-    @Stable val bottom: Dp = Dp.Unspecified,
-    @Stable val textColor: ButtonStateColor = ButtonStateColor.Unspecified
+    val start: Dp = Dp.Unspecified,
+    val top: Dp = Dp.Unspecified,
+    val end: Dp = Dp.Unspecified,
+    val bottom: Dp = Dp.Unspecified,
+    val textColor: ButtonStateColor = ButtonStateColor.Unspecified
 ) : ButtonDecorator {
     @Composable
     override fun Decoration(state: ButtonState, content: @Composable () -> Unit) {
@@ -122,15 +123,15 @@ fun RoundButtonDecorator(
 @Stable
 fun RoundButtonDecorator(
     horizontal: Dp = Dp.Unspecified,
-    vertices: Dp = Dp.Unspecified,
+    vertical: Dp = Dp.Unspecified,
     radius: Dp = Dp.Unspecified,
     textColor: ButtonStateColor = ButtonStateColor.Unspecified,
     background: ButtonStateColor = ButtonStateColor.Unspecified
 ) = RoundButtonDecorator(
     start = horizontal,
-    top = vertices,
+    top = vertical,
     end = horizontal,
-    bottom = vertices,
+    bottom = vertical,
     radius = radius,
     textColor = textColor,
     background = background
@@ -138,13 +139,13 @@ fun RoundButtonDecorator(
 
 @Immutable
 class RoundButtonDecorator(
-    @Stable val start: Dp = Dp.Unspecified,
-    @Stable val top: Dp = Dp.Unspecified,
-    @Stable val end: Dp = Dp.Unspecified,
-    @Stable val bottom: Dp = Dp.Unspecified,
-    @Stable val radius: Dp = Dp.Unspecified,
-    @Stable val textColor: ButtonStateColor = ButtonStateColor.Unspecified,
-    @Stable val background: ButtonStateColor = ButtonStateColor.Unspecified
+    val start: Dp = Dp.Unspecified,
+    val top: Dp = Dp.Unspecified,
+    val end: Dp = Dp.Unspecified,
+    val bottom: Dp = Dp.Unspecified,
+    val radius: Dp = Dp.Unspecified,
+    val textColor: ButtonStateColor = ButtonStateColor.Unspecified,
+    val background: ButtonStateColor = ButtonStateColor.Unspecified
 ) : ButtonDecorator {
     @Composable
     override fun Decoration(state: ButtonState, content: @Composable () -> Unit) {
@@ -156,6 +157,7 @@ class RoundButtonDecorator(
             modifier = Modifier
                 .drawBehind {
                     val color = background.current(state)
+                    if (color.isUnspecified) return@drawBehind
                     val radius = radius.takeOrElse { (min(size.width, size.height) / 2).toDp() }
                     drawRoundRect(color = color, cornerRadius = CornerRadius(radius.toPx()))
                 }

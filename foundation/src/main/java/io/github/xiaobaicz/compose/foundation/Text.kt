@@ -231,30 +231,34 @@ val defaultLineHeightStyle = LineHeightStyle(
 
 @Immutable
 private data class TextAutoSizeByLineHeight(
-    @Stable val fontSize: TextUnit,
-    @Stable val lineHeight: TextUnit,
-    @Stable val lineHeightFactor: Float,
+    val fontSize: TextUnit,
+    val lineHeight: TextUnit,
+    val lineHeightFactor: Float,
 ) : TextAutoSize {
     override fun TextAutoSizeLayoutScope.getFontSize(
         constraints: Constraints,
         text: AnnotatedString
     ): TextUnit {
+        require(lineHeightFactor >= 1f) { "lineHeightFactor should be greater than or equal to 1f" }
+
         val useFontSize = fontSize.isSpecified && fontSize >= FONT_SIZE_MIN
         val useLineHeight = lineHeight.isSpecified && lineHeight >= FONT_SIZE_MIN
 
         val fontSize = if (useFontSize) fontSize else FONT_SIZE_DEFAULT
         val lineHeight = if (useLineHeight) lineHeight else fontSize * lineHeightFactor
 
-        val fontSizePx = fontSize.toPx()
-        val maxFontSizePx =
-            min(lineHeight.roundToPx(), constraints.maxHeight) / lineHeightFactor.coerceAtLeast(1f)
+        val maxFontSizePx = min(lineHeight.roundToPx(), constraints.maxHeight) / lineHeightFactor
+        val maxFontSize = maxFontSizePx.toSp()
 
-        val autoSizePx = fontSizePx.coerceIn(FONT_SIZE_MIN.toPx(), maxFontSizePx)
-        return autoSizePx.toSp()
+        return when {
+            fontSize > maxFontSize -> maxFontSize
+            fontSize < FONT_SIZE_MIN -> FONT_SIZE_MIN
+            else -> fontSize
+        }
     }
 
     companion object {
-        private val FONT_SIZE_MIN = 0.sp
+        private val FONT_SIZE_MIN = 4.sp
         private val FONT_SIZE_DEFAULT = 14.sp
     }
 }

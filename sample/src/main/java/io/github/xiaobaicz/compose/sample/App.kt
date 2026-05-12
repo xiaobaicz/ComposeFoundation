@@ -69,7 +69,7 @@ fun TVApp() {
         val decorator = remember {
             RoundButtonDecorator(
                 horizontal = 64.dp,
-                vertices = 0.dp,
+                vertical = 0.dp,
                 radius = 32.dp,
                 textColor = ButtonStateColor(Color.White, Color.Black),
                 background = ButtonStateColor(Color.Gray, Color.Yellow),
